@@ -30,41 +30,56 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // Mock Line Chart for Balance History (7 days)
-    if (document.getElementById('balanceChart')) {
+    // Grouped Bar Chart for Monthly Income vs Expense (starting from May)
+    if (document.getElementById('balanceChart') && window.barLabels && window.barIncome && window.barExpense) {
         const ctxBalance = document.getElementById('balanceChart').getContext('2d');
-        
-        // Mock data
-        const today = new Date();
-        const dates = [];
-        const balances = [1000, 1200, 1150, 1100, 1300, 1250, 1500]; // Mock balance
-        
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            dates.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-        }
 
         new Chart(ctxBalance, {
-            type: 'line',
+            type: 'bar',
             data: {
-                labels: dates,
-                datasets: [{
-                    label: 'Balance ($)',
-                    data: balances,
-                    borderColor: '#36a2eb',
-                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.3
-                }]
+                labels: window.barLabels,
+                datasets: [
+                    {
+                        label: 'Income ($)',
+                        data: window.barIncome,
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderColor: '#16a34a',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    },
+                    {
+                        label: 'Expense ($)',
+                        data: window.barExpense,
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                        borderColor: '#dc2626',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ctx.dataset.label.replace('($)', '') + ': $' + ctx.raw.toFixed(2);
+                            }
+                        }
+                    }
+                },
                 scales: {
                     y: {
-                        beginAtZero: false
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value;
+                            }
+                        }
                     }
                 }
             }

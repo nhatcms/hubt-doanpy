@@ -15,6 +15,92 @@
     </div>
 </div>
 
+<!-- Filter — Techy Pill Button + Popover -->
+<div class="filter-wrapper" id="chipFilterContainer">
+    <button class="filter-pill" id="filterTrigger">
+        <i class="bi bi-funnel-fill"></i>
+        <span>Filters</span>
+        <span class="filter-badge" id="filterCount">0</span>
+        <i class="bi bi-chevron-down filter-chevron"></i>
+    </button>
+
+    <div class="filter-popover" id="filterPopover" style="display:none;">
+        <div class="filter-popover-header">
+            <span class="filter-popover-title">
+                <i class="bi bi-funnel"></i> Active Filters
+            </span>
+            <button class="filter-popover-close" id="filterPopoverClose" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="filter-popover-body">
+            <div class="chip-list" id="chipList">
+                <span class="chip-placeholder" id="chipPlaceholder">No filters active</span>
+            </div>
+
+            <button class="filter-add-pill" id="chipAddBtn">
+                <i class="bi bi-plus-lg"></i> Add filter
+            </button>
+
+            <!-- Autocomplete Dropdown -->
+            <div class="chip-autocomplete" id="chipAutocomplete" style="display:none;">
+                <div class="autocomplete-search">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="autocompleteInput" placeholder="Search filters..." autocomplete="off">
+                </div>
+                <div class="autocomplete-list" id="autocompleteList">
+                    <div class="autocomplete-item" data-type="date_range">
+                        <i class="bi bi-calendar-range"></i>
+                        <div>
+                            <div class="autocomplete-item-title">Date range</div>
+                            <div class="autocomplete-item-desc">From → To</div>
+                        </div>
+                    </div>
+                    <div class="autocomplete-item" data-type="amount_range">
+                        <i class="bi bi-cash-stack"></i>
+                        <div>
+                            <div class="autocomplete-item-title">Amount range</div>
+                            <div class="autocomplete-item-desc">Min → Max</div>
+                        </div>
+                    </div>
+                    <div class="autocomplete-item" data-type="type">
+                        <i class="bi bi-tag"></i>
+                        <div>
+                            <div class="autocomplete-item-title">Transaction type</div>
+                            <div class="autocomplete-item-desc">Income / Expense / All</div>
+                        </div>
+                    </div>
+                    <div class="autocomplete-item" data-type="category">
+                        <i class="bi bi-grid"></i>
+                        <div>
+                            <div class="autocomplete-item-title">Category</div>
+                            <div class="autocomplete-item-desc">Filter by category</div>
+                        </div>
+                    </div>
+                    <div class="autocomplete-item" data-type="note_search">
+                        <i class="bi bi-pencil"></i>
+                        <div>
+                            <div class="autocomplete-item-title">Note contains</div>
+                            <div class="autocomplete-item-desc">Search in notes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Value Panel -->
+            <div class="chip-value-panel" id="chipValuePanel" style="display:none;"></div>
+        </div>
+
+        <div class="filter-popover-footer" id="chipFilterActions" style="display:none;">
+            <button class="btn btn-primary btn-sm" onclick="applyAllFilters()">
+                <i class="bi bi-funnel"></i> Apply Filters
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="clearAllFilters()">
+                <i class="bi bi-x-circle"></i> Clear All
+            </button>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="table-container">
         <table>
@@ -180,7 +266,468 @@
 </div>
 
 <script>
-// Store transaction data for edit modal
+// ============================================================
+//  FILTER CHIP SYSTEM
+// ============================================================
+
+var filterChips = {};          // { type: { label, params } }
+var currentEditingType = null; // which filter type is being edited
+var currentFilterValues = {};  // temp values in the editing panel
+
+var categoriesData = [
+    {% for cat in categories %}
+    { id: {{ cat.id }}, name: '{{ cat.name }}', type: '{{ cat.type }}' }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+// --- DOM references (must be assigned BEFORE the IIFE below) ---
+var addBtn = document.getElementById('chipAddBtn');
+var autocomplete = document.getElementById('chipAutocomplete');
+var autocompleteInput = document.getElementById('autocompleteInput');
+var autocompleteList = document.getElementById('autocompleteList');
+var valuePanel = document.getElementById('chipValuePanel');
+
+// --- Initialize chips from URL params on page load ---
+(function initChipsFromUrl() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('date_from') || params.get('date_to')) {
+        addChip('date_range', { date_from: params.get('date_from')||'', date_to: params.get('date_to')||'' });
+    }
+    if (params.get('type') === 'Income' || params.get('type') === 'Expense') {
+        addChip('type', { type: params.get('type') });
+    }
+    if (params.get('category_id')) {
+        var cid = params.get('category_id');
+        var cat = categoriesData.find(function(c) { return c.id == cid; });
+        addChip('category', { category_id: cid, category_name: cat ? cat.name : cid });
+    }
+    if (params.get('amount_min') || params.get('amount_max')) {
+        addChip('amount_range', { amount_min: params.get('amount_min')||'', amount_max: params.get('amount_max')||'' });
+    }
+    if (params.get('note_search')) {
+        addChip('note_search', { note_search: params.get('note_search') });
+    }
+    renderAll();
+})();
+
+// --- Chip Management ---
+function addChip(type, params) {
+    var label = buildChipLabel(type, params);
+    filterChips[type] = { label: label, params: params };
+}
+
+function removeChip(type) {
+    delete filterChips[type];
+    renderAll();
+}
+
+function buildChipLabel(type, params) {
+    switch (type) {
+        case 'date_range': {
+            var from = params.date_from || '...';
+            var to = params.date_to || '...';
+            return 'Date: ' + from + ' \u2192 ' + to;
+        }
+        case 'amount_range': {
+            var parts = [];
+            if (params.amount_min) parts.push('Min $' + params.amount_min);
+            if (params.amount_max) parts.push('Max $' + params.amount_max);
+            return 'Amount: ' + (parts.length ? parts.join(', ') : 'Any');
+        }
+        case 'type':
+            return 'Type: ' + params.type;
+        case 'category':
+            return 'Category: ' + (params.category_name || params.category_id);
+        case 'note_search':
+            return 'Note: "' + params.note_search + '"';
+        default:
+            return type;
+    }
+}
+
+// --- Rendering ---
+function renderAll() {
+    renderChips();
+    renderActions();
+    updateFilterCount();
+    closeAutocomplete();
+    closeValuePanel();
+}
+
+function renderChips() {
+    var list = document.getElementById('chipList');
+    var placeholder = document.getElementById('chipPlaceholder');
+    // Clear existing chips (keep placeholder)
+    list.querySelectorAll('.chip-tag').forEach(function(el) { el.remove(); });
+
+    var types = Object.keys(filterChips);
+    if (types.length === 0) {
+        placeholder.style.display = '';
+    } else {
+        placeholder.style.display = 'none';
+        types.forEach(function(type) {
+            var chip = filterChips[type];
+            var el = document.createElement('span');
+            el.className = 'chip-tag';
+            el.innerHTML = '<span class="chip-tag-label">' + escapeHtml(chip.label) + '</span>' +
+                           '<span class="chip-tag-remove" data-type="' + type + '">&times;</span>';
+            // Click chip label to re-edit
+            el.querySelector('.chip-tag-label').addEventListener('click', function() {
+                startEditingType(type);
+            });
+            el.querySelector('.chip-tag-remove').addEventListener('click', function(e) {
+                e.stopPropagation();
+                removeChip(type);
+            });
+            list.appendChild(el);
+        });
+    }
+}
+
+function renderActions() {
+    var actions = document.getElementById('chipFilterActions');
+    if (Object.keys(filterChips).length > 0) {
+        actions.style.display = 'flex';
+    } else {
+        actions.style.display = 'none';
+    }
+}
+
+function updateFilterCount() {
+    var count = Object.keys(filterChips).length;
+    var badge = document.getElementById('filterCount');
+    if (badge) badge.textContent = count;
+}
+
+// --- Autocomplete ---
+addBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    closeValuePanel();
+    if (autocomplete.style.display === 'none') {
+        openAutocomplete();
+    } else {
+        closeAutocomplete();
+    }
+});
+
+function openAutocomplete() {
+    autocomplete.style.display = 'block';
+    autocompleteInput.value = '';
+    autocompleteInput.focus();
+    filterAutocompleteItems('');
+}
+
+function closeAutocomplete() {
+    autocomplete.style.display = 'none';
+}
+
+autocompleteInput.addEventListener('input', function() {
+    filterAutocompleteItems(this.value.toLowerCase());
+});
+
+function filterAutocompleteItems(query) {
+    var items = autocompleteList.querySelectorAll('.autocomplete-item');
+    var hasVisible = false;
+    items.forEach(function(item) {
+        var text = item.textContent.toLowerCase();
+        if (query === '' || text.indexOf(query) !== -1) {
+            item.style.display = '';
+            hasVisible = true;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    // Toggle empty state
+    var emptyEl = autocompleteList.querySelector('.autocomplete-empty');
+    if (!hasVisible) {
+        if (!emptyEl) {
+            emptyEl = document.createElement('div');
+            emptyEl.className = 'autocomplete-empty';
+            emptyEl.textContent = 'No matching filters';
+            autocompleteList.appendChild(emptyEl);
+        }
+        emptyEl.style.display = '';
+    } else if (emptyEl) {
+        emptyEl.style.display = 'none';
+    }
+}
+
+autocompleteList.addEventListener('click', function(e) {
+    var item = e.target.closest('.autocomplete-item');
+    if (!item) return;
+    var type = item.getAttribute('data-type');
+    startEditingType(type);
+});
+
+// --- Popover Toggle ---
+var filterTrigger = document.getElementById('filterTrigger');
+var filterPopover = document.getElementById('filterPopover');
+var filterPopoverClose = document.getElementById('filterPopoverClose');
+
+function openPopover() {
+    filterPopover.style.display = 'block';
+    filterTrigger.classList.add('open');
+}
+
+function closePopover() {
+    filterPopover.style.display = 'none';
+    filterTrigger.classList.remove('open');
+    closeAutocomplete();
+    closeValuePanel();
+}
+
+filterTrigger.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (filterPopover.style.display === 'none') {
+        openPopover();
+    } else {
+        closePopover();
+    }
+});
+
+filterPopoverClose.addEventListener('click', function(e) {
+    e.stopPropagation();
+    closePopover();
+});
+
+// --- Value Panel ---
+
+function startEditingType(type) {
+    closeAutocomplete();
+    currentEditingType = type;
+    currentFilterValues = filterChips[type] ? Object.assign({}, filterChips[type].params) : {};
+    valuePanel.innerHTML = buildValuePanelHTML(type, currentFilterValues);
+    valuePanel.style.display = 'block';
+    // Focus first input
+    var firstInput = valuePanel.querySelector('input, select');
+    if (firstInput) firstInput.focus();
+    // Attach events
+    attachValuePanelEvents(type);
+}
+
+function closeValuePanel() {
+    valuePanel.style.display = 'none';
+    currentEditingType = null;
+    currentFilterValues = {};
+}
+
+function buildValuePanelHTML(type, values) {
+    switch (type) {
+        case 'date_range':
+            return '<div class="value-panel-inner">' +
+                '<div class="value-panel-header"><span class="value-panel-title"><i class="bi bi-calendar-range"></i> Date range</span>' +
+                '<button class="value-panel-close" onclick="closeValuePanel()">&times;</button></div>' +
+                '<div class="value-panel-body">' +
+                '<div class="value-row"><label>From</label><input type="date" id="vp_date_from" value="' + (values.date_from||'') + '"></div>' +
+                '<div class="value-row"><label>To</label><input type="date" id="vp_date_to" value="' + (values.date_to||'') + '"></div>' +
+                '<div class="value-presets">' +
+                '<button class="btn btn-ghost btn-sm preset-btn" data-preset="today">Today</button>' +
+                '<button class="btn btn-ghost btn-sm preset-btn" data-preset="week">This Week</button>' +
+                '<button class="btn btn-ghost btn-sm preset-btn" data-preset="month">This Month</button>' +
+                '</div>' +
+                '</div>' +
+                '<div class="value-panel-footer">' +
+                '<button class="btn btn-secondary btn-sm" onclick="closeValuePanel()">Cancel</button>' +
+                '<button class="btn btn-primary btn-sm" onclick="applyValuePanel()">Apply</button>' +
+                '</div></div>';
+
+        case 'amount_range':
+            return '<div class="value-panel-inner">' +
+                '<div class="value-panel-header"><span class="value-panel-title"><i class="bi bi-cash-stack"></i> Amount range</span>' +
+                '<button class="value-panel-close" onclick="closeValuePanel()">&times;</button></div>' +
+                '<div class="value-panel-body">' +
+                '<div class="value-row"><label>Min ($)</label><input type="number" step="0.01" id="vp_amount_min" value="' + (values.amount_min||'') + '" placeholder="0.00"></div>' +
+                '<div class="value-row"><label>Max ($)</label><input type="number" step="0.01" id="vp_amount_max" value="' + (values.amount_max||'') + '" placeholder="0.00"></div>' +
+                '</div>' +
+                '<div class="value-panel-footer">' +
+                '<button class="btn btn-secondary btn-sm" onclick="closeValuePanel()">Cancel</button>' +
+                '<button class="btn btn-primary btn-sm" onclick="applyValuePanel()">Apply</button>' +
+                '</div></div>';
+
+        case 'type':
+            var selIncome = values.type === 'Income' ? 'selected' : '';
+            var selExpense = values.type === 'Expense' ? 'selected' : '';
+            return '<div class="value-panel-inner">' +
+                '<div class="value-panel-header"><span class="value-panel-title"><i class="bi bi-tag"></i> Transaction type</span>' +
+                '<button class="value-panel-close" onclick="closeValuePanel()">&times;</button></div>' +
+                '<div class="value-panel-body">' +
+                '<div class="value-row"><label>Type</label>' +
+                '<select id="vp_type" class="form-select">' +
+                '<option value="Income" ' + selIncome + '>Income</option>' +
+                '<option value="Expense" ' + selExpense + '>Expense</option>' +
+                '</select></div>' +
+                '</div>' +
+                '<div class="value-panel-footer">' +
+                '<button class="btn btn-secondary btn-sm" onclick="closeValuePanel()">Cancel</button>' +
+                '<button class="btn btn-primary btn-sm" onclick="applyValuePanel()">Apply</button>' +
+                '</div></div>';
+
+        case 'category':
+            var catOpts = categoriesData.map(function(c) {
+                var sel = (values.category_id == c.id) ? 'selected' : '';
+                return '<option value="' + c.id + '" ' + sel + '>' + c.name + ' (' + c.type + ')</option>';
+            }).join('');
+            return '<div class="value-panel-inner">' +
+                '<div class="value-panel-header"><span class="value-panel-title"><i class="bi bi-grid"></i> Category</span>' +
+                '<button class="value-panel-close" onclick="closeValuePanel()">&times;</button></div>' +
+                '<div class="value-panel-body">' +
+                '<div class="value-row"><label>Category</label>' +
+                '<select id="vp_category_id" class="form-select"><option value="">Select category...</option>' + catOpts + '</select></div>' +
+                '</div>' +
+                '<div class="value-panel-footer">' +
+                '<button class="btn btn-secondary btn-sm" onclick="closeValuePanel()">Cancel</button>' +
+                '<button class="btn btn-primary btn-sm" onclick="applyValuePanel()">Apply</button>' +
+                '</div></div>';
+
+        case 'note_search':
+            return '<div class="value-panel-inner">' +
+                '<div class="value-panel-header"><span class="value-panel-title"><i class="bi bi-pencil"></i> Note contains</span>' +
+                '<button class="value-panel-close" onclick="closeValuePanel()">&times;</button></div>' +
+                '<div class="value-panel-body">' +
+                '<div class="value-row">' +
+                '<div class="search-input-wrapper">' +
+                '<i class="bi bi-search search-icon"></i>' +
+                '<input type="text" class="form-input" id="vp_note_search" value="' + (values.note_search||'') + '" placeholder="Search in notes...">' +
+                '</div></div>' +
+                '</div>' +
+                '<div class="value-panel-footer">' +
+                '<button class="btn btn-secondary btn-sm" onclick="closeValuePanel()">Cancel</button>' +
+                '<button class="btn btn-primary btn-sm" onclick="applyValuePanel()">Apply</button>' +
+                '</div></div>';
+
+        default:
+            return '';
+    }
+}
+
+function attachValuePanelEvents(type) {
+    if (type === 'date_range') {
+        valuePanel.querySelectorAll('.preset-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var preset = this.getAttribute('data-preset');
+                var today = new Date();
+                var from = '', to = '';
+                var dayOfWeek = today.getDay();
+                var mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                if (preset === 'today') {
+                    from = to = formatDate(today);
+                } else if (preset === 'week') {
+                    var monday = new Date(today);
+                    monday.setDate(today.getDate() + mondayOffset);
+                    from = formatDate(monday);
+                    to = formatDate(today);
+                } else if (preset === 'month') {
+                    from = formatDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                    to = formatDate(today);
+                }
+                var fromInput = document.getElementById('vp_date_from');
+                var toInput = document.getElementById('vp_date_to');
+                if (fromInput) fromInput.value = from;
+                if (toInput) toInput.value = to;
+            });
+        });
+    }
+    // Enter key to apply
+    valuePanel.querySelectorAll('input').forEach(function(input) {
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                applyValuePanel();
+            }
+        });
+    });
+}
+
+function applyValuePanel() {
+    if (!currentEditingType) return;
+    var params = {};
+    switch (currentEditingType) {
+        case 'date_range':
+            params.date_from = document.getElementById('vp_date_from') ? document.getElementById('vp_date_from').value : '';
+            params.date_to = document.getElementById('vp_date_to') ? document.getElementById('vp_date_to').value : '';
+            if (!params.date_from && !params.date_to) { closeValuePanel(); return; }
+            break;
+        case 'amount_range':
+            params.amount_min = document.getElementById('vp_amount_min') ? document.getElementById('vp_amount_min').value : '';
+            params.amount_max = document.getElementById('vp_amount_max') ? document.getElementById('vp_amount_max').value : '';
+            if (!params.amount_min && !params.amount_max) { closeValuePanel(); return; }
+            break;
+        case 'type':
+            params.type = document.getElementById('vp_type') ? document.getElementById('vp_type').value : 'Income';
+            break;
+        case 'category':
+            var catId = document.getElementById('vp_category_id') ? document.getElementById('vp_category_id').value : '';
+            if (!catId) { closeValuePanel(); return; }
+            params.category_id = catId;
+            var cat = categoriesData.find(function(c) { return c.id == catId; });
+            params.category_name = cat ? cat.name : catId;
+            break;
+        case 'note_search':
+            params.note_search = document.getElementById('vp_note_search') ? document.getElementById('vp_note_search').value.trim() : '';
+            if (!params.note_search) { closeValuePanel(); return; }
+            break;
+    }
+    addChip(currentEditingType, params);
+    renderAll();
+}
+
+function applyAllFilters() {
+    var params = new URLSearchParams();
+    Object.keys(filterChips).forEach(function(type) {
+        var p = filterChips[type].params;
+        Object.keys(p).forEach(function(key) {
+            if (p[key]) params.set(key, p[key]);
+        });
+    });
+    window.location.href = '/transactions?' + params.toString();
+}
+
+function clearAllFilters() {
+    filterChips = {};
+    window.location.href = '/transactions';
+}
+
+// --- Helpers ---
+function formatDate(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+}
+
+function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// --- Global click to close ---
+document.addEventListener('click', function(e) {
+    var container = document.getElementById('chipFilterContainer');
+    if (!container.contains(e.target)) {
+        closeAutocomplete();
+        closeValuePanel();
+        closePopover();
+    }
+});
+
+// ESC to close
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        if (currentEditingType) {
+            closeValuePanel();
+        } else if (filterPopover && filterPopover.style.display !== 'none') {
+            closePopover();
+        } else {
+            closeAutocomplete();
+        }
+    }
+});
+
+// ============================================================
+//  TRANSACTION MODALS (existing)
+// ============================================================
+
 var transactionsData = [
     {% for txn in transactions %}
     {
@@ -231,12 +778,14 @@ document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
     });
 });
 
-// Close modal on Escape key
+// Close modal & autocomplete on Escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        document.querySelectorAll('.modal-overlay.show').forEach(function(m) {
-            m.classList.remove('show');
-        });
+        var activeModals = document.querySelectorAll('.modal-overlay.show');
+        if (activeModals.length > 0) {
+            activeModals.forEach(function(m) { m.classList.remove('show'); });
+            return;
+        }
     }
 });
 </script>
