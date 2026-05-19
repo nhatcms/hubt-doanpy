@@ -4,6 +4,10 @@
 <div class="action-bar">
     <h2>Transactions</h2>
     <div class="action-bar-actions">
+        <a href="{{ url_for('export_transactions_pdf') }}" class="btn btn-outline">
+            <i class="bi bi-filetype-pdf"></i>
+            Export PDF
+        </a>
         <button type="button" class="btn btn-primary" onclick="openModal('addTransactionModal')">
             <i class="bi bi-plus-lg"></i>
             Add Transaction
@@ -44,12 +48,13 @@
                         </span>
                     </td>
                     <td class="text-center">
-                        <button class="btn btn-ghost btn-sm" title="Edit">
+                        <button class="btn btn-ghost btn-sm" title="Edit" onclick="openEditModal({{ txn.id }})">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-ghost btn-sm" title="Delete" style="color: var(--destructive);">
+                        <button class="btn btn-ghost btn-sm" title="Delete" style="color: var(--destructive);" onclick="confirmDelete({{ txn.id }})">
                             <i class="bi bi-trash"></i>
                         </button>
+                        <form id="delete-form-{{ txn.id }}" action="{{ url_for('delete_transaction', id=txn.id) }}" method="POST" style="display:none;"></form>
                     </td>
                 </tr>
                 {% else %}
@@ -59,9 +64,6 @@
                             <i class="bi bi-credit-card-2-front"></i>
                             <h4>No transactions yet</h4>
                             <p>Start tracking your finances by adding your first transaction.</p>
-                            <button type="button" class="btn btn-primary" onclick="openModal('addTransactionModal')">
-                                <i class="bi bi-plus-lg"></i> Add Transaction
-                            </button>
                         </div>
                     </td>
                 </tr>
@@ -116,13 +118,108 @@
     </div>
 </div>
 
+<!-- Edit Transaction Modal -->
+<div class="modal-overlay" id="editTransactionModal">
+    <div class="modal-content">
+        <form id="edit-transaction-form" method="POST">
+            <div class="modal-header">
+                <h4 class="modal-title">Edit Transaction</h4>
+                <button type="button" class="modal-close" onclick="closeModal('editTransactionModal')">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="edit-amount">Amount</label>
+                    <input type="number" step="0.01" class="form-input" id="edit-amount" name="amount" placeholder="0.00" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="edit-category_id">Category</label>
+                    <select class="form-select" id="edit-category_id" name="category_id" required>
+                        <option value="" disabled>Select a category</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }} ({{ cat.type }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="edit-date">Date</label>
+                    <input type="date" class="form-input" id="edit-date" name="date">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="edit-note">Note</label>
+                    <input type="text" class="form-input" id="edit-note" name="note" placeholder="Optional description">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editTransactionModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Transaction</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" id="deleteConfirmModal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h4 class="modal-title">Delete Transaction</h4>
+            <button type="button" class="modal-close" onclick="closeModal('deleteConfirmModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete this transaction? This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('deleteConfirmModal')">Cancel</button>
+            <button type="button" class="btn btn-danger" id="confirm-delete-btn" onclick="submitDelete()">Delete</button>
+        </div>
+    </div>
+</div>
+
 <script>
+// Store transaction data for edit modal
+var transactionsData = [
+    {% for txn in transactions %}
+    {
+        id: {{ txn.id }},
+        amount: {{ txn.amount }},
+        category_id: {{ txn.category_id }},
+        date: '{{ txn.date.strftime("%Y-%m-%d") }}',
+        note: '{{ txn.note|replace("'", "\\'") if txn.note else "" }}'
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
 function openModal(id) {
     document.getElementById(id).classList.add('show');
 }
 
 function closeModal(id) {
     document.getElementById(id).classList.remove('show');
+}
+
+function openEditModal(id) {
+    var txn = transactionsData.find(function(t) { return t.id === id; });
+    if (!txn) return;
+    document.getElementById('edit-amount').value = txn.amount;
+    document.getElementById('edit-category_id').value = txn.category_id;
+    document.getElementById('edit-date').value = txn.date;
+    document.getElementById('edit-note').value = txn.note;
+    document.getElementById('edit-transaction-form').action = '/edit_transaction/' + id;
+    openModal('editTransactionModal');
+}
+
+function confirmDelete(id) {
+    document.getElementById('confirm-delete-btn').setAttribute('data-id', id);
+    openModal('deleteConfirmModal');
+}
+
+function submitDelete() {
+    var id = document.getElementById('confirm-delete-btn').getAttribute('data-id');
+    document.getElementById('delete-form-' + id).submit();
 }
 
 // Close modal on overlay click

@@ -1,9 +1,19 @@
-from flask import Flask, render_template, redirect, url_for, flash, request
+from flask import Flask, render_template, redirect, url_for, flash, request, Response
 from extensions import db, login
 from flask_login import current_user, login_user, logout_user, login_required
 from config import Config
 from datetime import datetime
 from models import User, Category, Transaction
+from io import BytesIO
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import os
+import re
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -57,8 +67,46 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     if request.method == 'POST':
-        user = User(username=request.form['username'], email=request.form['email'])
-        user.set_password(request.form['password'])
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+
+        errors = []
+
+        # Validate username
+        if not username:
+            errors.append('Username is required.')
+        elif not re.match(r'^[a-zA-Z0-9_]{3,20}$', username):
+            errors.append('Username must be 3-20 characters and can only contain letters, numbers, and underscores.')
+
+        # Validate email
+        if not email:
+            errors.append('Email is required.')
+        elif not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            errors.append('Invalid email format.')
+
+        # Validate password
+        if not password:
+            errors.append('Password is required.')
+        else:
+            if len(password) < 6:
+                errors.append('Password must be at least 6 characters.')
+            if ' ' in password:
+                errors.append('Password must not contain spaces.')
+
+        # Check for existing user
+        if not errors and User.query.filter_by(username=username).first():
+            errors.append('Username already exists.')
+        if not errors and User.query.filter_by(email=email).first():
+            errors.append('Email already registered.')
+
+        if errors:
+            for error in errors:
+                flash(error, 'error')
+            return render_template('register.html', title='Register')
+
+        user = User(username=username, email=email)
+        user.set_password(password)
         db.session.add(user)
         db.session.commit()
         flash('Congratulations, you are now a registered user!', 'success')
@@ -71,6 +119,180 @@ def transactions():
     user_transactions = Transaction.query.filter_by(user_id=current_user.id).order_by(Transaction.date.desc()).all()
     categories = Category.query.all()
     return render_template('transactions.html', title='Transactions', transactions=user_transactions, categories=categories)
+
+def register_font():
+    """Register a Unicode-capable font for PDF. Falls back to Helvetica if no TTF found."""
+    font_candidates = [
+        # Common Vietnamese-supporting font names across platforms
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+    ]
+    for path in font_candidates:
+        if os.path.exists(path):
+            try:
+                pdfmetrics.registerFont(TTFont("UnicodeFont", path))
+                return "UnicodeFont"
+            except Exception:
+                continue
+    return "Helvetica"
+
+FONT_NAME = register_font()
+
+def build_pdf(transactions, user_name):
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=landscape(A4),
+        topMargin=15*mm,
+        bottomMargin=15*mm,
+        leftMargin=15*mm,
+        rightMargin=15*mm,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "CustomTitle",
+        parent=styles["Heading1"],
+        fontName=FONT_NAME,
+        fontSize=16,
+        spaceAfter=6*mm,
+        textColor=colors.HexColor("#18181b"),
+    )
+    subtitle_style = ParagraphStyle(
+        "Subtitle",
+        parent=styles["Normal"],
+        fontName=FONT_NAME,
+        fontSize=9,
+        spaceAfter=4*mm,
+        textColor=colors.HexColor("#71717a"),
+    )
+    cell_style = ParagraphStyle(
+        "Cell",
+        parent=styles["Normal"],
+        fontName=FONT_NAME,
+        fontSize=8,
+        leading=11,
+        alignment=1,  # CENTER
+    )
+    cell_left = ParagraphStyle(
+        "CellLeft", parent=cell_style, alignment=0
+    )
+    elements = []
+
+    # Title row
+    elements.append(Paragraph("Transaction Report", title_style))
+    elements.append(
+        Paragraph(
+            f"User: {user_name} &nbsp;|&nbsp; "
+            f"Total transactions: {len(transactions)} &nbsp;|&nbsp; "
+            f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC",
+            subtitle_style,
+        )
+    )
+    elements.append(Spacer(1, 3*mm))
+
+    # Table data
+    header = ["Date", "Category", "Note", "Amount", "Type"]
+    data = [header]
+
+    total_income = 0.0
+    total_expense = 0.0
+
+    for txn in transactions:
+        amt = txn.amount
+        txn_type = txn.category.type
+        if txn_type == "Income":
+            total_income += amt
+            amount_str = f"+${amt:,.2f}"
+        else:
+            total_expense += amt
+            amount_str = f"-${amt:,.2f}"
+
+        data.append([
+            Paragraph(txn.date.strftime("%Y-%m-%d"), cell_style),
+            Paragraph(f"{txn.category.name}", cell_style),
+            Paragraph(txn.note or "—", cell_left),
+            Paragraph(amount_str, cell_style),
+            Paragraph(txn_type, cell_style),
+        ])
+
+    # Summary row
+    balance = total_income - total_expense
+    data.append([
+        Paragraph("<b>Summary</b>", cell_style),
+        Paragraph("", cell_style),
+        Paragraph("", cell_style),
+        Paragraph(
+            f"Income: <font color='#15803d'>+${total_income:,.2f}</font><br/>"
+            f"Expense: <font color='#dc2626'>-${total_expense:,.2f}</font><br/>"
+            f"Balance: ${balance:,.2f}",
+            ParagraphStyle("SummaryCell", parent=cell_style, alignment=1, fontSize=8, leading=13),
+        ),
+        Paragraph("", cell_style),
+    ])
+
+    col_widths = [55*mm, 45*mm, 65*mm, 45*mm, 40*mm]
+    table = Table(data, colWidths=col_widths, repeatRows=1)
+
+    table_style = TableStyle([
+        # Header row
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#18181b")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), FONT_NAME),
+        ("FONTSIZE", (0, 0), (-1, 0), 8.5),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ("TOPPADDING", (0, 0), (-1, 0), 8),
+        # Body
+        ("FONTNAME", (0, 1), (-1, -1), FONT_NAME),
+        ("FONTSIZE", (0, 1), (-1, -1), 8),
+        ("TOPPADDING", (0, 1), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
+        ("GRID", (0, 0), (-1, -2), 0.5, colors.HexColor("#e4e4e7")),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        # Summary row
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#f4f4f5")),
+        ("LINEABOVE", (0, -1), (-1, -1), 1, colors.HexColor("#18181b")),
+        # Zebra stripes
+        *[
+            (("BACKGROUND", (0, i), (-1, i), colors.HexColor("#fafafa")))
+            for i in range(2, len(data) - 1, 2)
+        ],
+    ])
+    table.setStyle(table_style)
+
+    elements.append(table)
+    doc.build(elements)
+    buf.seek(0)
+    return buf
+
+
+@app.route('/export_transactions_pdf')
+@login_required
+def export_transactions_pdf():
+    user_transactions = (
+        Transaction.query
+        .filter_by(user_id=current_user.id)
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+
+    if not user_transactions:
+        flash("No transactions to export.", "info")
+        return redirect(url_for("transactions"))
+
+    pdf_buf = build_pdf(user_transactions, current_user.username)
+    return Response(
+        pdf_buf,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=transactions_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf"
+        },
+    )
+
 
 @app.route('/add_transaction', methods=['POST'])
 @login_required
@@ -87,6 +309,40 @@ def add_transaction():
     flash('Transaction added successfully.', 'success')
     return redirect(url_for('transactions'))
 
+@app.route('/edit_transaction/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit_transaction(id):
+    txn = Transaction.query.get_or_404(id)
+    if txn.user_id != current_user.id:
+        flash('You do not have permission to edit this transaction.', 'error')
+        return redirect(url_for('transactions'))
+    
+    if request.method == 'POST':
+        txn.amount = float(request.form['amount'])
+        txn.category_id = int(request.form['category_id'])
+        txn.note = request.form['note']
+        date_str = request.form['date']
+        if date_str:
+            txn.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        db.session.commit()
+        flash('Transaction updated successfully.', 'success')
+        return redirect(url_for('transactions'))
+    
+    categories = Category.query.all()
+    return render_template('edit_transaction.html', title='Edit Transaction', txn=txn, categories=categories)
+
+@app.route('/delete_transaction/<int:id>', methods=['POST'])
+@login_required
+def delete_transaction(id):
+    txn = Transaction.query.get_or_404(id)
+    if txn.user_id != current_user.id:
+        flash('You do not have permission to delete this transaction.', 'error')
+        return redirect(url_for('transactions'))
+    db.session.delete(txn)
+    db.session.commit()
+    flash('Transaction deleted successfully.', 'success')
+    return redirect(url_for('transactions'))
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
@@ -100,4 +356,4 @@ if __name__ == '__main__':
             ]
             db.session.bulk_save_objects(categories)
             db.session.commit()
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5001)
