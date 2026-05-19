@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="action-bar">
+    <h2>Transactions</h2>
+    <div class="action-bar-actions">
+        <button type="button" class="btn btn-primary" onclick="openModal('addTransactionModal')">
+            <i class="bi bi-plus-lg"></i>
+            Add Transaction
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Category</th>
+                    <th>Note</th>
+                    <th>Amount</th>
+                    <th>Type</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for txn in transactions %}
+                <tr>
+                    <td>{{ txn.date.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <span class="flex items-center gap-2">
+                            <i class="bi {{ txn.category.icon }}"></i>
+                            {{ txn.category.name }}
+                        </span>
+                    </td>
+                    <td class="text-muted">{{ txn.note or '—' }}</td>
+                    <td class="{% if txn.category.type == 'Income' %}amount-positive{% else %}amount-negative{% endif %}">
+                        {{ '+' if txn.category.type == 'Income' else '-' }}${{ "%.2f"|format(txn.amount) }}
+                    </td>
+                    <td>
+                        <span class="badge {% if txn.category.type == 'Income' %}badge-income{% else %}badge-expense{% endif %}">
+                            {{ txn.category.type }}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <button class="btn btn-ghost btn-sm" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-ghost btn-sm" title="Delete" style="color: var(--destructive);">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6">
+                        <div class="empty-state">
+                            <i class="bi bi-credit-card-2-front"></i>
+                            <h4>No transactions yet</h4>
+                            <p>Start tracking your finances by adding your first transaction.</p>
+                            <button type="button" class="btn btn-primary" onclick="openModal('addTransactionModal')">
+                                <i class="bi bi-plus-lg"></i> Add Transaction
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="addTransactionModal">
+    <div class="modal-content">
+        <form action="{{ url_for('add_transaction') }}" method="POST">
+            <div class="modal-header">
+                <h4 class="modal-title">Add Transaction</h4>
+                <button type="button" class="modal-close" onclick="closeModal('addTransactionModal')">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="amount">Amount</label>
+                    <input type="number" step="0.01" class="form-input" id="amount" name="amount" placeholder="0.00" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="category_id">Category</label>
+                    <select class="form-select" id="category_id" name="category_id" required>
+                        <option value="" disabled selected>Select a category</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }} ({{ cat.type }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="date">Date</label>
+                    <input type="date" class="form-input" id="date" name="date">
+                    <div class="form-hint">Defaults to today if left empty.</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="note">Note</label>
+                    <input type="text" class="form-input" id="note" name="note" placeholder="Optional description">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addTransactionModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Transaction</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id) {
+    document.getElementById(id).classList.add('show');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+    overlay.addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.classList.remove('show');
+        }
+    });
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.show').forEach(function(m) {
+            m.classList.remove('show');
+        });
+    }
+});
+</script>
+{% endblock %}

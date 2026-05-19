@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="card stat-card stat-income card-hover">
+        <div class="card-body">
+            <div class="stat-icon"><i class="bi bi-graph-up-arrow"></i></div>
+            <div class="stat-label">Total Income</div>
+            <div class="stat-value">${{ "%.2f"|format(total_income) }}</div>
+            <div class="stat-trend text-success">
+                <i class="bi bi-arrow-up"></i> Income
+            </div>
+        </div>
+    </div>
+
+    <div class="card stat-card stat-expense card-hover">
+        <div class="card-body">
+            <div class="stat-icon"><i class="bi bi-graph-down-arrow"></i></div>
+            <div class="stat-label">Total Expense</div>
+            <div class="stat-value">${{ "%.2f"|format(total_expense) }}</div>
+            <div class="stat-trend text-danger">
+                <i class="bi bi-arrow-down"></i> Expense
+            </div>
+        </div>
+    </div>
+
+    <div class="card stat-card stat-balance card-hover">
+        <div class="card-body">
+            <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
+            <div class="stat-label">Balance</div>
+            <div class="stat-value">${{ "%.2f"|format(balance) }}</div>
+            <div class="stat-trend">
+                <i class="bi bi-circle-fill" style="font-size: 0.4rem; vertical-align: middle;"></i> Net
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Grid -->
+<div class="charts-grid">
+    <div class="card">
+        <div class="card-header">
+            <h5>Expenses by Category</h5>
+            <div class="card-header-icon"><i class="bi bi-pie-chart"></i></div>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="expensesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5>Balance History</h5>
+            <div class="card-header-icon"><i class="bi bi-graph-up"></i></div>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="balanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.expensesLabels = {{ expenses_labels | tojson | safe }};
+    window.expensesData = {{ expenses_data | tojson | safe }};
+</script>
+{% endblock %}

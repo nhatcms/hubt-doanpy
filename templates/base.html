@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} — FinanceApp</title>
+    <!-- Bootstrap Icons (for icon set only) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="{% if request.endpoint in ['login', 'register'] %}auth-body{% endif %}">
+
+<div class="app-layout">
+    {% if request.endpoint not in ['login', 'register'] %}
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo-icon">F</div>
+            <span class="sidebar-logo-text">FinanceApp</span>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">Main</div>
+            <a class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                <i class="bi bi-layout-dashboard"></i>
+                Dashboard
+            </a>
+            <a class="sidebar-link {% if request.endpoint == 'transactions' %}active{% endif %}" href="{{ url_for('transactions') }}">
+                <i class="bi bi-arrow-left-right"></i>
+                Transactions
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <a class="sidebar-link" href="{{ url_for('logout') }}">
+                <i class="bi bi-box-arrow-right"></i>
+                Log out
+            </a>
+        </div>
+    </aside>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% if request.endpoint not in ['login', 'register'] %}
+        <!-- Top Header -->
+        <header class="top-header">
+            <div class="top-header-left">
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                    <i class="bi bi-list"></i>
+                </button>
+                <h1 class="page-title">{{ title }}</h1>
+            </div>
+            <div class="top-header-right">
+                <div class="user-badge">
+                    <span class="user-avatar">{{ current_user.username[:1].upper() }}</span>
+                    <span class="hidden-mobile">{{ current_user.username }}</span>
+                </div>
+            </div>
+        </header>
+        {% endif %}
+
+        <!-- Content -->
+        <div class="content-area {% if request.endpoint in ['login', 'register'] %}content-auth{% endif %}">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for cat, message in messages %}
+                {% set cat = cat if cat in ['info', 'success', 'error'] else 'info' %}
+                <div class="alert alert-{{ cat }}">
+                    <i class="bi {% if cat == 'success' %}bi-check-circle{% elif cat == 'error' %}bi-exclamation-circle{% else %}bi-info-circle{% endif %}"></i>
+                    {{ message }}
+                    <button class="alert-dismiss" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+</div>
+
+<!-- Mobile sidebar toggle -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const menuBtn = document.getElementById('mobileMenuBtn');
+
+    function toggleSidebar() {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('show');
+    }
+
+    if (menuBtn) {
+        menuBtn.addEventListener('click', toggleSidebar);
+    }
+    if (overlay) {
+        overlay.addEventListener('click', toggleSidebar);
+    }
+});
+</script>
+
+<!-- Custom JS -->
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+</body>
+</html>
