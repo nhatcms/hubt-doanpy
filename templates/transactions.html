@@ -4,7 +4,7 @@
 <div class="action-bar">
     <h2>Transactions</h2>
     <div class="action-bar-actions">
-        <a href="{{ url_for('export_transactions_pdf') }}" class="btn btn-outline">
+        <a href="{{ url_for('transactions.export_transactions_pdf') }}" class="btn btn-outline">
             <i class="bi bi-filetype-pdf"></i>
             Export PDF
         </a>
@@ -140,7 +140,7 @@
                         <button class="btn btn-ghost btn-sm" title="Delete" style="color: var(--destructive);" onclick="confirmDelete({{ txn.id }})">
                             <i class="bi bi-trash"></i>
                         </button>
-                        <form id="delete-form-{{ txn.id }}" action="{{ url_for('delete_transaction', id=txn.id) }}" method="POST" style="display:none;"></form>
+                        <form id="delete-form-{{ txn.id }}" action="{{ url_for('transactions.delete_transaction', id=txn.id) }}" method="POST" style="display:none;"></form>
                     </td>
                 </tr>
                 {% else %}
@@ -162,7 +162,7 @@
 <!-- Add Transaction Modal -->
 <div class="modal-overlay" id="addTransactionModal">
     <div class="modal-content">
-        <form action="{{ url_for('add_transaction') }}" method="POST">
+        <form action="{{ url_for('transactions.add_transaction') }}" method="POST">
             <div class="modal-header">
                 <h4 class="modal-title">Add Transaction</h4>
                 <button type="button" class="modal-close" onclick="closeModal('addTransactionModal')">&times;</button>

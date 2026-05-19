@@ -11,10 +11,10 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="{% if request.endpoint in ['login', 'register'] %}auth-body{% endif %}">
+<body class="{% if request.endpoint in ['auth.login', 'auth.register'] %}auth-body{% endif %}">
 
 <div class="app-layout">
-    {% if request.endpoint not in ['login', 'register'] %}
+    {% if request.endpoint not in ['auth.login', 'auth.register'] %}
     <!-- Sidebar Overlay (mobile) -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
@@ -27,18 +27,22 @@
 
         <nav class="sidebar-nav">
             <div class="sidebar-section-label">Main</div>
-            <a class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+            <a class="sidebar-link {% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}" href="{{ url_for('dashboard.dashboard') }}">
                 <i class="bi bi-layout-dashboard"></i>
                 Dashboard
             </a>
-            <a class="sidebar-link {% if request.endpoint == 'transactions' %}active{% endif %}" href="{{ url_for('transactions') }}">
+            <a class="sidebar-link {% if request.endpoint == 'transactions.transactions' %}active{% endif %}" href="{{ url_for('transactions.transactions') }}">
                 <i class="bi bi-arrow-left-right"></i>
                 Transactions
             </a>
         </nav>
 
         <div class="sidebar-footer">
-            <a class="sidebar-link" href="{{ url_for('logout') }}">
+            <button class="sidebar-link" onclick="openChangePasswordModal()">
+                <i class="bi bi-key"></i>
+                Change password
+            </button>
+            <a class="sidebar-link" href="{{ url_for('auth.logout') }}">
                 <i class="bi bi-box-arrow-right"></i>
                 Log out
             </a>
@@ -48,7 +52,7 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        {% if request.endpoint not in ['login', 'register'] %}
+        {% if request.endpoint not in ['auth.login', 'auth.register'] %}
         <!-- Top Header -->
         <header class="top-header">
             <div class="top-header-left">
@@ -67,7 +71,7 @@
         {% endif %}
 
         <!-- Content -->
-        <div class="content-area {% if request.endpoint in ['login', 'register'] %}content-auth{% endif %}">
+        <div class="content-area {% if request.endpoint in ['auth.login', 'auth.register'] %}content-auth{% endif %}">
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for cat, message in messages %}
@@ -84,6 +88,41 @@
             {% block content %}{% endblock %}
         </div>
     </main>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Change Password Modal -->
+<div class="modal-overlay" id="changePasswordModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Change password</h3>
+            <button class="modal-close" onclick="closeChangePasswordModal()">&times;</button>
+        </div>
+        <form id="changePasswordForm" onsubmit="return submitChangePassword(event)">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="current_password">Current password</label>
+                    <input type="password" class="form-input" id="current_password" name="current_password" placeholder="Enter current password" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="new_password">New password</label>
+                    <input type="password" class="form-input" id="new_password" name="new_password" placeholder="Enter new password" required>
+                    <div class="form-hint">At least 6 characters, no spaces allowed.</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="confirm_password">Confirm new password</label>
+                    <input type="password" class="form-input" id="confirm_password" name="confirm_password" placeholder="Re-enter new password" required>
+                </div>
+                <div id="changePasswordError" style="display:none;" class="alert alert-error"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeChangePasswordModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="changePasswordSubmitBtn">Change password</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Mobile sidebar toggle -->
@@ -105,6 +144,84 @@ document.addEventListener('DOMContentLoaded', function() {
         overlay.addEventListener('click', toggleSidebar);
     }
 });
+
+/* ---------- Change Password Modal ---------- */
+function openChangePasswordModal() {
+    document.getElementById('changePasswordModal').classList.add('show');
+    document.getElementById('changePasswordForm').reset();
+    document.getElementById('changePasswordError').style.display = 'none';
+}
+
+function closeChangePasswordModal() {
+    document.getElementById('changePasswordModal').classList.remove('show');
+}
+
+function showToast(message, type) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+
+    const icon = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle';
+    toast.innerHTML = '<i class="bi ' + icon + '"></i> ' + message;
+
+    container.appendChild(toast);
+
+    setTimeout(function() {
+        toast.style.animation = 'toastOut 0.3s ease-in forwards';
+        setTimeout(function() {
+            toast.remove();
+        }, 300);
+    }, 3000);
+}
+
+function submitChangePassword(event) {
+    event.preventDefault();
+
+    var btn = document.getElementById('changePasswordSubmitBtn');
+    var errorDiv = document.getElementById('changePasswordError');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    var form = document.getElementById('changePasswordForm');
+    var formData = new FormData(form);
+
+    fetch('/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            current_password: formData.get('current_password'),
+            new_password: formData.get('new_password'),
+            confirm_password: formData.get('confirm_password')
+        })
+    })
+    .then(function(resp) {
+        return resp.json().then(function(data) {
+            return { status: resp.status, data: data };
+        });
+    })
+    .then(function(result) {
+        if (result.status === 200 && result.data.success) {
+            closeChangePasswordModal();
+            showToast(result.data.message, 'success');
+            setTimeout(function() {
+                window.location.href = '/login';
+            }, 2000);
+        } else {
+            errorDiv.style.display = 'block';
+            errorDiv.innerHTML = '<i class="bi bi-exclamation-circle"></i> ' + result.data.errors.join('<br>');
+            btn.disabled = false;
+            btn.textContent = 'Change password';
+        }
+    })
+    .catch(function() {
+        errorDiv.style.display = 'block';
+        errorDiv.innerHTML = '<i class="bi bi-exclamation-circle"></i> An unexpected error occurred. Please try again.';
+        btn.disabled = false;
+        btn.textContent = 'Change password';
+    });
+
+    return false;
+}
 </script>
 
 <!-- Custom JS -->

@@ -3,4 +3,4 @@ from flask_login import LoginManager
 
 db = SQLAlchemy()
 login = LoginManager()
-login.login_view = 'login'
+login.login_view = 'auth.login'
