@@ -18,26 +18,44 @@ def transactions():
     amount_min_str = request.args.get('amount_min', '').strip()
     amount_max_str = request.args.get('amount_max', '').strip()
     note_search = request.args.get('note_search', '').strip()
+    
+    # Pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # Maximum 10 transactions per page
 
-    # --- Default date range: last 7 days ---
+    # --- Default date range: show all transactions if no filters applied, otherwise use date range ---
     today = date.today()
-    if date_from_str:
-        date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date()
-    else:
-        date_from = today - timedelta(days=7)
-        date_from_str = date_from.strftime('%Y-%m-%d')
+    # Only apply date range if there are other filters, otherwise show all transactions
+    if date_from_str or date_to_str or type_filter != 'All' or category_id or amount_min_str or amount_max_str or note_search:
+        # Apply specific date range if provided
+        if date_from_str:
+            date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+        else:
+            date_from = today - timedelta(days=30)  # Default to last 30 days
+            date_from_str = date_from.strftime('%Y-%m-%d')
 
-    if date_to_str:
-        date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+        if date_to_str:
+            date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+        else:
+            date_to = today
+            date_to_str = date_to.strftime('%Y-%m-%d')
     else:
-        date_to = today
-        date_to_str = date_to.strftime('%Y-%m-%d')
+        # No date range - show all transactions
+        date_from = None
+        date_to = None
+        date_from_str = ''
+        date_to_str = ''
 
     # --- Build query with filters ---
     query = Transaction.query.filter_by(user_id=current_user.id).join(Category)
 
-    # Date range
-    query = query.filter(Transaction.date >= date_from, Transaction.date <= date_to)
+    # Date range - only apply if date_from and date_to are set
+    if date_from and date_to:
+        query = query.filter(Transaction.date >= date_from, Transaction.date <= date_to)
+    elif date_from:  # Only from date is set
+        query = query.filter(Transaction.date >= date_from)
+    elif date_to:  # Only to date is set
+        query = query.filter(Transaction.date <= date_to)
 
     # Type filter (Income / Expense)
     if type_filter in ('Income', 'Expense'):
@@ -57,12 +75,16 @@ def transactions():
     if note_search:
         query = query.filter(Transaction.note.ilike(f'%{note_search}%'))
 
-    user_transactions = query.order_by(Transaction.date.desc()).all()
+    # Apply pagination
+    paginated_transactions = query.order_by(Transaction.date.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
     categories = Category.query.all()
 
     return render_template('transactions.html',
                            title='Transactions',
-                           transactions=user_transactions,
+                           transactions=paginated_transactions,
                            categories=categories,
                            date_from=date_from_str,
                            date_to=date_to_str,
@@ -70,7 +92,12 @@ def transactions():
                            category_id=category_id,
                            amount_min=amount_min_str,
                            amount_max=amount_max_str,
-                           note_search=note_search)
+                           note_search=note_search,
+                           page=page,
+                           per_page=per_page,
+                           total=paginated_transactions.total,
+                           has_next=paginated_transactions.has_next,
+                           has_prev=paginated_transactions.has_prev)
 
 
 @transactions_bp.route('/add_transaction', methods=['POST'])

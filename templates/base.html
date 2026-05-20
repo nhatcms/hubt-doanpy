@@ -76,11 +76,11 @@
             {% if messages %}
                 {% for cat, message in messages %}
                 {% set cat = cat if cat in ['info', 'success', 'error'] else 'info' %}
-                <div class="alert alert-{{ cat }}">
-                    <i class="bi {% if cat == 'success' %}bi-check-circle{% elif cat == 'error' %}bi-exclamation-circle{% else %}bi-info-circle{% endif %}"></i>
-                    {{ message }}
-                    <button class="alert-dismiss" onclick="this.parentElement.remove()">&times;</button>
-                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        showToast('{{ message }}', '{{ cat }}');
+                    });
+                </script>
                 {% endfor %}
             {% endif %}
             {% endwith %}
@@ -166,12 +166,25 @@ function showToast(message, type) {
 
     container.appendChild(toast);
 
+    // Auto-dismiss after 4 seconds
     setTimeout(function() {
-        toast.style.animation = 'toastOut 0.3s ease-in forwards';
+        toast.style.animation = 'toastOut 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards';
         setTimeout(function() {
-            toast.remove();
+            if (toast && toast.parentNode) {
+                toast.remove();
+            }
         }, 300);
-    }, 3000);
+    }, 4000);
+    
+    // Allow manual dismissal
+    toast.addEventListener('click', function() {
+        toast.style.animation = 'toastOut 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards';
+        setTimeout(function() {
+            if (toast && toast.parentNode) {
+                toast.remove();
+            }
+        }, 300);
+    });
 }
 
 function submitChangePassword(event) {
@@ -221,6 +234,27 @@ function submitChangePassword(event) {
     });
 
     return false;
+}
+
+/* ---------- Demo Account Auto-fill ---------- */
+function fillDemoAccount() {
+    var usernameInput = document.getElementById('username');
+    var passwordInput = document.getElementById('password');
+    
+    if (usernameInput && passwordInput) {
+        usernameInput.value = 'lt22025059';
+        passwordInput.value = 'lt22025059';
+        
+        // Add visual feedback
+        usernameInput.style.borderColor = 'var(--success)';
+        passwordInput.style.borderColor = 'var(--success)';
+        
+        // Reset border color after 2 seconds
+        setTimeout(function() {
+            usernameInput.style.borderColor = '';
+            passwordInput.style.borderColor = '';
+        }, 2000);
+    }
 }
 </script>
 

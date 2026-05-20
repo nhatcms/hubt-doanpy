@@ -20,15 +20,18 @@ def dashboard():
         if t.category.type == 'Expense':
             expenses_by_cat[t.category.name] = expenses_by_cat.get(t.category.name, 0) + t.amount
 
-    # Calculate monthly income & expense for bar chart, starting from May
+    # Calculate for income pie chart
+    income_by_cat = {}
+    for t in transactions:
+        if t.category.type == 'Income':
+            income_by_cat[t.category.name] = income_by_cat.get(t.category.name, 0) + t.amount
+
+    # Calculate monthly income & expense for bar chart, show all 12 months of current year
     now = datetime.utcnow()
     current_year = now.year
-    current_month = now.month
 
-    # Build list of months from May of current_year up to current_month
-    months = []
-    for m in range(5, current_month + 1):
-        months.append((current_year, m))
+    # Build list of all 12 months for current year
+    months = [(current_year, month) for month in range(1, 13)]  # Months 1-12 for current year
 
     # Group transactions by (year, month)
     monthly_income = {}
@@ -59,6 +62,8 @@ def dashboard():
                            balance=balance,
                            expenses_labels=list(expenses_by_cat.keys()),
                            expenses_data=list(expenses_by_cat.values()),
+                           income_labels=list(income_by_cat.keys()),
+                           income_data=list(income_by_cat.values()),
                            bar_labels=bar_labels,
                            bar_income=bar_income,
                            bar_expense=bar_expense)

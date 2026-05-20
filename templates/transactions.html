@@ -115,7 +115,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for txn in transactions %}
+                {% for txn in transactions.items %}
                 <tr>
                     <td>{{ txn.date.strftime('%Y-%m-%d') }}</td>
                     <td>
@@ -156,6 +156,60 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+    
+    <!-- Pagination Controls -->
+    <div class="pagination-container">
+        <div class="pagination-info">
+            Showing {{ transactions.items|length }} of {{ total }} transactions
+            {% if transactions.pages > 1 %}(Page {{ page }} of {{ transactions.pages }}){% endif %}
+            {% if not date_from and not date_to %}
+            <span class="badge badge-secondary">All transactions</span>
+            {% endif %}
+        </div>
+        {% if transactions.pages > 1 %}
+        <div class="pagination-controls">
+            {% if transactions.has_prev %}
+            <a href="{{ url_for('transactions.transactions', page=transactions.prev_num, 
+                               date_from=date_from if date_from else '', date_to=date_to if date_to else '', 
+                               type=type_filter, 
+                               category_id=category_id, amount_min=amount_min, 
+                               amount_max=amount_max, note_search=note_search) }}" 
+               class="btn btn-ghost btn-sm pagination-btn">
+                <i class="bi bi-chevron-left"></i> Previous
+            </a>
+            {% endif %}
+            
+            <!-- Page numbers -->
+            {% for num in transactions.iter_pages(left_edge=1, left_current=2, right_current=4, right_edge=1) %}
+                {% if num %}
+                    {% if num != page %}
+                    <a href="{{ url_for('transactions.transactions', page=num, 
+                                       date_from=date_from if date_from else '', date_to=date_to if date_to else '', 
+                                       type=type_filter, 
+                                       category_id=category_id, amount_min=amount_min, 
+                                       amount_max=amount_max, note_search=note_search) }}" 
+                       class="btn btn-ghost btn-sm pagination-btn">{{ num }}</a>
+                    {% else %}
+                    <span class="btn btn-primary btn-sm pagination-btn active">{{ num }}</span>
+                    {% endif %}
+                {% else %}
+                <span class="btn btn-ghost btn-sm pagination-btn disabled">...</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if transactions.has_next %}
+            <a href="{{ url_for('transactions.transactions', page=transactions.next_num, 
+                               date_from=date_from if date_from else '', date_to=date_to if date_to else '', 
+                               type=type_filter, 
+                               category_id=category_id, amount_min=amount_min, 
+                               amount_max=amount_max, note_search=note_search) }}" 
+               class="btn btn-ghost btn-sm pagination-btn">
+                Next <i class="bi bi-chevron-right"></i>
+            </a>
+            {% endif %}
+                </div>
+        {% endif %}
     </div>
 </div>
 

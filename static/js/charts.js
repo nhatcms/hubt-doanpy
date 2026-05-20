@@ -1,4 +1,42 @@
 document.addEventListener("DOMContentLoaded", function() {
+    // Pie Chart for Income by Category
+    if (document.getElementById('incomeChart') && window.incomeLabels && window.incomeData) {
+        const ctxIncome = document.getElementById('incomeChart').getContext('2d');
+        new Chart(ctxIncome, {
+            type: 'pie',
+            data: {
+                labels: window.incomeLabels,
+                datasets: [{
+                    data: window.incomeData,
+                    backgroundColor: [
+                        '#22c55e',
+                        '#10b981',
+                        '#059669',
+                        '#047857',
+                        '#065f46',
+                        '#064e3b'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ctx.label + ': $' + ctx.raw.toFixed(2);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     // Doughnut Chart for Expenses by Category
     if (document.getElementById('expensesChart') && window.expensesLabels && window.expensesData) {
         const ctxExpenses = document.getElementById('expensesChart').getContext('2d');

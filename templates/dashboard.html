@@ -41,6 +41,18 @@
 <div class="charts-grid">
     <div class="card">
         <div class="card-header">
+            <h5>Income by Category</h5>
+            <div class="card-header-icon"><i class="bi bi-pie-chart"></i></div>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="incomeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
             <h5>Expenses by Category</h5>
             <div class="card-header-icon"><i class="bi bi-pie-chart"></i></div>
         </div>
@@ -51,7 +63,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card full-width-chart">
         <div class="card-header">
             <h5>Monthly Income vs Expense</h5>
             <div class="card-header-icon"><i class="bi bi-bar-chart"></i></div>
@@ -65,6 +77,8 @@
 </div>
 
 <script>
+    window.incomeLabels = {{ income_labels | tojson | safe }};
+    window.incomeData = {{ income_data | tojson | safe }};
     window.expensesLabels = {{ expenses_labels | tojson | safe }};
     window.expensesData = {{ expenses_data | tojson | safe }};
     window.barLabels = {{ bar_labels | tojson | safe }};
