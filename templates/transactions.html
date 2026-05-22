@@ -101,45 +101,61 @@
     </div>
 </div>
 
-<div class="card">
-    <div class="table-container">
-        <table>
+<div class="card transactions-card">
+    <div class="table-container transactions-table-wrap">
+        <table class="transactions-table">
             <thead>
                 <tr>
-                    <th>Date</th>
-                    <th>Category</th>
-                    <th>Note</th>
-                    <th>Amount</th>
-                    <th>Type</th>
-                    <th class="text-center">Actions</th>
+                    <th class="col-date">Date</th>
+                    <th class="col-category">
+                        <span class="th-long">Category</span>
+                        <span class="th-short" aria-hidden="true"><i class="bi bi-grid"></i></span>
+                    </th>
+                    <th class="col-note">Note</th>
+                    <th class="col-amount">
+                        <span class="th-long">Amount</span>
+                        <span class="th-short">Amt</span>
+                    </th>
+                    <th class="col-type">Type</th>
+                    <th class="col-actions text-center">
+                        <span class="th-long">Actions</span>
+                        <span class="th-short" aria-hidden="true"><i class="bi bi-sliders"></i></span>
+                    </th>
                 </tr>
             </thead>
             <tbody>
                 {% for txn in transactions.items %}
                 <tr>
-                    <td>{{ txn.date.strftime('%Y-%m-%d') }}</td>
-                    <td>
-                        <span class="flex items-center gap-2">
-                            <i class="bi {{ txn.category.icon }}"></i>
-                            {{ txn.category.name }}
+                    <td class="col-date">
+                        <span class="date-full">{{ txn.date.strftime('%Y-%m-%d') }}</span>
+                        <span class="date-short">{{ txn.date.strftime('%m/%d') }}</span>
+                    </td>
+                    <td class="col-category">
+                        <span class="category-cell" title="{{ txn.category.name }} ({{ txn.category.type }})">
+                            <i class="bi {{ txn.category.icon }} category-icon" aria-hidden="true"></i>
+                            <span class="category-name">{{ txn.category.name }}</span>
                         </span>
                     </td>
-                    <td class="text-muted">{{ txn.note or '—' }}</td>
-                    <td class="{% if txn.category.type == 'Income' %}amount-positive{% else %}amount-negative{% endif %}">
+                    <td class="col-note text-muted">
+                        <span class="note-text" title="{{ txn.note or '' }}">{{ txn.note or '—' }}</span>
+                    </td>
+                    <td class="col-amount {% if txn.category.type == 'Income' %}amount-positive{% else %}amount-negative{% endif %}">
                         {{ '+' if txn.category.type == 'Income' else '-' }}${{ "%.2f"|format(txn.amount) }}
                     </td>
-                    <td>
+                    <td class="col-type">
                         <span class="badge {% if txn.category.type == 'Income' %}badge-income{% else %}badge-expense{% endif %}">
                             {{ txn.category.type }}
                         </span>
                     </td>
-                    <td class="text-center">
-                        <button class="btn btn-ghost btn-sm" title="Edit" onclick="openEditModal({{ txn.id }})">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn btn-ghost btn-sm" title="Delete" style="color: var(--destructive);" onclick="confirmDelete({{ txn.id }})">
-                            <i class="bi bi-trash"></i>
-                        </button>
+                    <td class="col-actions text-center">
+                        <div class="txn-actions">
+                            <button class="btn btn-ghost btn-sm" title="Edit" onclick="openEditModal({{ txn.id }})">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-ghost btn-sm" title="Delete" style="color: var(--destructive);" onclick="confirmDelete({{ txn.id }})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
                         <form id="delete-form-{{ txn.id }}" action="{{ url_for('transactions.delete_transaction', id=txn.id) }}" method="POST" style="display:none;"></form>
                     </td>
                 </tr>

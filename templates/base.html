@@ -59,7 +59,16 @@
                 <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
                     <i class="bi bi-list"></i>
                 </button>
-                <h1 class="page-title">{{ title }}</h1>
+                <div class="page-title-group">
+                    {% if request.endpoint == 'dashboard.dashboard' %}
+                    <i class="bi bi-layout-dashboard page-title-icon" aria-hidden="true"></i>
+                    {% elif request.endpoint == 'transactions.transactions' %}
+                    <i class="bi bi-arrow-left-right page-title-icon" aria-hidden="true"></i>
+                    {% elif request.endpoint and 'transaction' in request.endpoint %}
+                    <i class="bi bi-pencil-square page-title-icon" aria-hidden="true"></i>
+                    {% endif %}
+                    <h1 class="page-title">{{ title }}</h1>
+                </div>
             </div>
             <div class="top-header-right">
                 <div class="user-badge">

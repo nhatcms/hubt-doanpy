@@ -1,5 +1,6 @@
 from flask import render_template, redirect, url_for, flash, request, Response
 from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload
 from extensions import db
 from models import Category, Transaction
 from datetime import datetime, date, timedelta
@@ -46,8 +47,13 @@ def transactions():
         date_from_str = ''
         date_to_str = ''
 
-    # --- Build query with filters ---
-    query = Transaction.query.filter_by(user_id=current_user.id).join(Category)
+    # --- Build query with filters (eager-load category for table icon/name) ---
+    query = (
+        Transaction.query
+        .filter_by(user_id=current_user.id)
+        .options(joinedload(Transaction.category))
+        .join(Category)
+    )
 
     # Date range - only apply if date_from and date_to are set
     if date_from and date_to:

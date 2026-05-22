@@ -44,14 +44,18 @@ def dashboard():
             monthly_expense[key] = monthly_expense.get(key, 0) + t.amount
 
     # Build labels (Vietnamese month names) and data arrays
-    month_names = ['', 'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5',
-                   'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10',
-                   'Tháng 11', 'Tháng 12']
+    month_names = [
+        '', 'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5',
+        'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10',
+        'Tháng 11', 'Tháng 12',
+    ]
     bar_labels = []
+    bar_labels_short = []
     bar_income = []
     bar_expense = []
     for yr, m in months:
         bar_labels.append(f'{month_names[m]} {yr}')
+        bar_labels_short.append(str(m))
         bar_income.append(round(monthly_income.get((yr, m), 0), 2))
         bar_expense.append(round(monthly_expense.get((yr, m), 0), 2))
 
@@ -65,5 +69,6 @@ def dashboard():
                            income_labels=list(income_by_cat.keys()),
                            income_data=list(income_by_cat.values()),
                            bar_labels=bar_labels,
+                           bar_labels_short=bar_labels_short,
                            bar_income=bar_income,
                            bar_expense=bar_expense)

@@ -77,12 +77,13 @@
 </div>
 
 <script>
-    window.incomeLabels = {{ income_labels | tojson | safe }};
-    window.incomeData = {{ income_data | tojson | safe }};
-    window.expensesLabels = {{ expenses_labels | tojson | safe }};
-    window.expensesData = {{ expenses_data | tojson | safe }};
-    window.barLabels = {{ bar_labels | tojson | safe }};
-    window.barIncome = {{ bar_income | tojson | safe }};
-    window.barExpense = {{ bar_expense | tojson | safe }};
+    window.incomeLabels = {{ income_labels | tojson }};
+    window.incomeData = {{ income_data | tojson }};
+    window.expensesLabels = {{ expenses_labels | tojson }};
+    window.expensesData = {{ expenses_data | tojson }};
+    window.barLabels = {{ bar_labels | tojson }};
+    window.barLabelsShort = {{ bar_labels_short | tojson }};
+    window.barIncome = {{ bar_income | tojson }};
+    window.barExpense = {{ bar_expense | tojson }};
 </script>
 {% endblock %}
