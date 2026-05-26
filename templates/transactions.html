@@ -179,9 +179,6 @@
         <div class="pagination-info">
             Showing {{ transactions.items|length }} of {{ total }} transactions
             {% if transactions.pages > 1 %}(Page {{ page }} of {{ transactions.pages }}){% endif %}
-            {% if not date_from and not date_to %}
-            <span class="badge badge-secondary">All transactions</span>
-            {% endif %}
         </div>
         {% if transactions.pages > 1 %}
         <div class="pagination-controls">

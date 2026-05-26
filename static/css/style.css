@@ -2018,6 +2018,7 @@ hr {
 /* ---------- Pagination ---------- */
 .pagination-container {
   margin-top: 1.5rem;
+  margin-bottom: 1rem;
   border-top: 1px solid var(--border);
   padding-top: 1rem;
   display: flex;
